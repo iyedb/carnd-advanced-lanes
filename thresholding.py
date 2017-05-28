@@ -77,21 +77,24 @@ def threshold(img_array, matrix, coeffs, M, color=False):
         undistorted_img,
         orient='x',
         thresh_min=30,
-        thresh_max=80,
-        kernel_size=7
+        thresh_max=150,
+        kernel_size=9
     )
+
     grady_binary = abs_sobel_thresh(
         undistorted_img,
         orient='y',
         thresh_min=50,
         thresh_max=70,
-        kernel_size=7
+        kernel_size=9
     )
+
     mag_binary = magnitude_thresh(
         undistorted_img,
         sobel_kernel=5,
-        mag_thresh=(40, 100)
+        mag_thresh=(45, 80)
     )
+
     dir_binary = dir_threshold(
         undistorted_img,
         sobel_kernel=7,
@@ -102,12 +105,15 @@ def threshold(img_array, matrix, coeffs, M, color=False):
     combined_mag_dir[(mag_binary == 1) & (dir_binary == 1)] = 1
 
     combined = np.zeros_like(dir_binary)
-    combined[
-        (
-            (gradx_binary == 1) &
-            (grady_binary == 1)
-        )
-    ] = 1
+    # combined[
+    #     (
+    #         (gradx_binary == 1) &
+    #         (grady_binary == 1)
+    #     )
+    # ] = 1
+
+    combined[((gradx_binary == 1) & (grady_binary == 1)) | ((mag_binary == 1) & (dir_binary == 1))] = 1
+
 
     hls = cv2.cvtColor(img_array, cv2.COLOR_RGB2HLS)
     schannel = hls[:, :, 2]
@@ -135,7 +141,7 @@ if __name__ == '__main__':
     persp = pickle.load(open('./camera_cal/persp_pickle.p', 'rb'))
     M = persp['M']
     Minv = persp['Minv']
-    test_img = plt.imread('./test_images/test4.jpg')
+    test_img = plt.imread('./test_images/test6.jpg')
     res = threshold(test_img, mtx, dist, M)
     plt.imsave('./output_images/binary.jpg', res, cmap='gray')
     res = threshold(test_img, mtx, dist, M, True)

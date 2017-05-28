@@ -1,6 +1,8 @@
 import numpy as np
 import cv2
 
+import utils
+
 
 class LaneDetector:
     def __init__(self, nwindows=9, minpixels=50, margin=100):
@@ -40,18 +42,6 @@ class LaneDetector:
             # right window
             win_xright_low = rightx_current - self.margin
             win_xright_high = rightx_current + self.margin
-
-            # Draw the windows on the visualization image
-            # cv2.rectangle(
-            #     out_img, (win_xleft_low, win_y_low),
-            #     (win_xleft_high, win_y_high), (0, 255, 0),
-            #     2
-            # )
-            # cv2.rectangle(
-            #     out_img, (win_xright_low, win_y_low),
-            #     (win_xright_high, win_y_high), (0, 255, 0),
-            #     2
-            # )
 
             # Identify the nonzero pixels in x and y within the window
             good_left_inds = (
@@ -135,6 +125,21 @@ class LaneDetector:
         self.left_fit_poly = np.polyfit(lefty, leftx, 2)
         self.right_fit_poly = np.polyfit(righty, rightx, 2)
 
+    def draw_lane_warped(self, binary_warped):
+        """
+        return a RGB image with a warped green lane drawn
+        """
+        l, r, ys = self.get_lines(binary_warped)
+        warp_zero = np.zeros_like(binary_warped).astype(np.uint8)
+        color_warp = np.dstack((warp_zero, warp_zero, warp_zero))*255
+        pts_left = np.array([np.transpose(np.vstack([l, ys]))])
+        pts_right = np.array([np.flipud(np.transpose(np.vstack([r, ys])))])
+        pts = np.hstack((pts_left, pts_right))
+        return cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
+
+    def draw_lane(self, binary_warped, Minv):
+        return utils.perspective_change(self.draw_lane_warped(binary_warped), Minv)
+
     def get_lines(self, binary_warped):
         ploty = np.linspace(
             0,
@@ -165,23 +170,12 @@ class LaneDetector:
         ) / np.absolute(2*right_fit[0])
         return left_curverad, right_curverad
 
-    def draw_lane_warped(self, binary_warped):
-        l, r, ys = self.get_lines(binary_warped)
-        warp_zero = np.zeros_like(binary_warped).astype(np.uint8)
-        color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
-        pts_left = np.array([np.transpose(np.vstack([l, ys]))])
-        pts_right = np.array([np.flipud(np.transpose(np.vstack([r, ys])))])
-        pts = np.hstack((pts_left, pts_right))
-        return cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
-
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     binary_warped = plt.imread('./test_images/warped_example.jpg')
     detector = LaneDetector()
-    # detector.window_search(binary_warped)
     detector.detect(binary_warped)
-    # left_line, right_line, ys = detector.get_lines(binary_warped)
     res = detector.draw_lane_warped(binary_warped)
     print(detector.get_curvature(binary_warped))
     plt.imsave('./output_images/res2.jpg', res)
