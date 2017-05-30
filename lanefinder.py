@@ -12,16 +12,20 @@ class LaneDetector:
         self.left_fit_poly = None
         self.right_fit_poly = None
         self.minpix = minpixels
+        self.ym_per_pix = 3.0/72.0
+        self.xm_per_pix = 3.7/660.0
 
     def window_search(self, binary_warped):
         histogram = np.sum(
             binary_warped[binary_warped.shape[0]//2:, :],
             axis=0
         )
+
         midpoint = np.int(histogram.shape[0] / 2)
         leftx_base = np.argmax(histogram[:midpoint])
         rightx_base = np.argmax(histogram[midpoint:]) + midpoint
         window_height = np.int(binary_warped.shape[0] / self.nwindows)
+
         nonzero = binary_warped.nonzero()
         nonzeroy = np.array(nonzero[0])
         nonzerox = np.array(nonzero[1])
@@ -152,6 +156,7 @@ class LaneDetector:
 
     def get_curvature(self, binary_warped):
         leftx, rightx, ploty = self.get_lines(binary_warped)
+
         left_fit = np.polyfit(ploty, leftx, 2)
         right_fit = np.polyfit(ploty, rightx, 2)
         at_y = np.max(ploty)
@@ -171,6 +176,49 @@ class LaneDetector:
         return left_curverad, right_curverad
 
 
+    def get_curvature2(self, binary_warped):
+        ploty = np.linspace(
+            0,
+            binary_warped.shape[0] - 1,
+            binary_warped.shape[0]
+        )
+        at_y = np.max(ploty)
+        left_curverad = (
+            (
+                1 +
+                (2*self.left_fit_poly[0]*at_y + self.left_fit_poly[1])**2
+            )**1.5
+        ) / np.absolute(2*self.left_fit_poly[0])
+
+        right_curverad = (
+            (
+                1 +
+                (2*self.right_fit_poly[0]*at_y + self.right_fit_poly[1])**2
+            )**1.5
+        ) / np.absolute(2*self.right_fit_poly[0])
+        return left_curverad, right_curverad
+
+    def get_curvature3(self, binary_warped):
+        
+        y_eval = binary_warped.shape[0] - 20
+        left_curverad = (
+            (1 + (2*self.left_fit_poly[0]*y_eval*self.ym_per_pix + self.left_fit_poly[1])**2)**1.5
+        ) / np.absolute(2*self.left_fit_poly[0])
+
+        right_curverad = (
+            (1 + (2*self.right_fit_poly[0]*y_eval*self.ym_per_pix + self.right_fit_poly[1])**2)**1.5
+        ) / np.absolute(2*self.right_fit_poly[0])
+        return np.mean(np.array([left_curverad, right_curverad]))
+
+    def get_position_from_lane_center(self, binary_warped):
+        y_eval = binary_warped.shape[0] - 20
+        midx = binary_warped.shape[1] / 2
+        x_left_pix = self.left_fit_poly[0]*(y_eval**2) + self.left_fit_poly[1]*y_eval + self.left_fit_poly[2]
+        x_right_pix = self.right_fit_poly[0]*(y_eval**2) + self.right_fit_poly[1]*y_eval + self.right_fit_poly[2]
+        
+        return ((x_left_pix + x_right_pix)/2.0 - midx) * self.xm_per_pix
+
+
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     binary_warped = plt.imread('./test_images/warped_example.jpg')
@@ -178,4 +226,10 @@ if __name__ == '__main__':
     detector.detect(binary_warped)
     res = detector.draw_lane_warped(binary_warped)
     print(detector.get_curvature(binary_warped))
+    print(detector.get_curvature2(binary_warped))
+    print(detector.left_fit_poly)
+    print(detector.right_fit_poly)
+    print(detector.get_curvature3(binary_warped))
+    print(detector.get_position_from_lane_center(binary_warped))
+
     plt.imsave('./output_images/res2.jpg', res)

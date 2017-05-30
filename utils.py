@@ -13,5 +13,5 @@ def undistort_image(img_arr, matrix, coeffs):
     return cv2.undistort(img_arr, matrix, coeffs, None, matrix)
 
 
-def weighted_img(img, initial_img, α=0.8, β=1., λ=0.):
+def weighted_img(img, initial_img, α=0.3, β=1., λ=0.):
     return cv2.addWeighted(initial_img, α, img, β, λ)
