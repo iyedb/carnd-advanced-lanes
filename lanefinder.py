@@ -92,12 +92,18 @@ class LaneDetector:
         return poly[0]*(arr**2) + poly[1]*arr + poly[2] + margin
 
     def detect(self, binary_warped):
+        # if the polynomials are None, this is the first frame
+        # so we perform a sliding window search
         if self.left_fit_poly is None and self.right_fit_poly is None:
             self.window_search(binary_warped)
 
+        # Else we search the lane lines pixels within a range
+        # with respect to the polynomial applied to the value of the
+        # current frame
         nonzero = binary_warped.nonzero()
         nonzeroy = np.array(nonzero[0])
         nonzerox = np.array(nonzero[1])
+
 
         left_lane_inds = (
             (nonzerox >
