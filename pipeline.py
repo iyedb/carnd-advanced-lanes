@@ -27,10 +27,11 @@ class Pipeline:
         lane = self.detector.draw_lane(binary_warped, self.Minv)
         frame = utils.weighted_img(frame, lane)
         if self.curv is None:
-            self.curv = 'Radius of Curvature: %.2fm' % self.detector.get_curvature3(binary_warped)
-        r = random.choice(range(1, 10))
-        if r == 1:
-            self.curv = 'Radius of Curvature: %.2fm' % self.detector.get_curvature3(binary_warped)
+            self.curv = 'Radius of Curvature: %.2fm' % self.detector.curvature
+        # r = random.choice(range(1, 10))
+        # if r == 1:
+        #     self.curv = 'Radius of Curvature: %.2fm' % self.detector.curvature
+        self.curv = 'Radius of Curvature: %.2fm' % self.detector.curvature
         cv2.putText(
             frame,
             self.curv,
@@ -38,6 +39,7 @@ class Pipeline:
             cv2.FONT_HERSHEY_SIMPLEX,
             1, (255, 255, 255), 2
         )
+
         dist = np.absolute(self.detector.get_position_from_lane_center(binary_warped))
         if dist >= 0:
             dist_text = '%.2fm %s' % (dist, 'right')
@@ -70,6 +72,7 @@ if __name__ == '__main__':
     Minv = persp['Minv']
 
     test_img = plt.imread('./test_images/test1.jpg')
+    # test_img = plt.imread('./test_images/signs_vehicles_xygrad.jpg')
     p = Pipeline(mtx, dist, M, Minv)
     res = p.process_frame(test_img)
     plt.imsave('./output_images/frame.png', res, cmap='gray')
