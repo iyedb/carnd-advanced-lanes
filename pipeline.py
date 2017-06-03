@@ -22,7 +22,7 @@ class Pipeline:
             self.mtx,
             self.coeffs,
             self.M
-        )
+        )[0]
         self.detector.detect(binary_warped)
         lane = self.detector.draw_lane(binary_warped, self.Minv)
         frame = utils.weighted_img(frame, lane)
@@ -71,9 +71,20 @@ if __name__ == '__main__':
     M = persp['M']
     Minv = persp['Minv']
 
-    test_img = plt.imread('./test_images/test1.jpg')
-    # test_img = plt.imread('./test_images/signs_vehicles_xygrad.jpg')
+    test_img1 = plt.imread('./test_images/test1.jpg')
+    test_img2 = plt.imread('./test_images/signs_vehicles_xygrad.jpg')
+    test_img3 = plt.imread('./extracted_images/frame_45.jpg')
+
     p = Pipeline(mtx, dist, M, Minv)
-    res = p.process_frame(test_img)
-    plt.imsave('./output_images/frame.png', res, cmap='gray')
+    res = p.process_frame(test_img1)
+    plt.imsave('./output_images/frame1.png', res)
+
+    p = Pipeline(mtx, dist, M, Minv)
+    res = p.process_frame(test_img2)
+    plt.imsave('./output_images/frame2.png', res)
+
+    p = Pipeline(mtx, dist, M, Minv)
+    res = p.process_frame(test_img3)
+    plt.imsave('./output_images/frame3.png', res)
+
 
