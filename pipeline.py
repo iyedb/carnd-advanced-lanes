@@ -23,7 +23,7 @@ class Pipeline:
             self.coeffs,
             self.M
         )[0]
-        self.detector.detect(binary_warped)
+        self.detector.detect2(binary_warped)
         lane = self.detector.draw_lane(binary_warped, self.Minv)
         frame = utils.weighted_img(frame, lane)
         if self.curv is None:

@@ -9,41 +9,73 @@ class Line():
     def __init__(self, maxlen=10):
         # was the line detected in the last iteration?
         self.detected = False
-        # x values of the last n fits of the line
-        self.recent_xfitted = collections.deque(maxlen=10)
-        #average x values of the fitted line over the last n iterations
-        self.bestx = None
-        #polynomial coefficients averaged over the last n iterations
-        self.best_fit = None
-        #polynomial coefficients for the most recent fit
-        self.current_fit = [np.array([False])]
-        #radius of curvature of the line in some units
-        self.radius_of_curvature = None
-        #distance in meters of vehicle center from the line
-        self.line_base_pos = None
-        #difference in fit coefficients between last and new fits
-        self.diffs = np.array([0,0,0], dtype='float')
-        #x values for detected line pixels
-        self.allx = None
-        #y values for detected line pixels
-        self.ally = None
 
-        def update(self, fit, fitx):
-            pass
+        # x values of the last n fits of the line
+        self.recent_xfitted = collections.deque(maxlen=4)
+
+        # average x values of the fitted line over the last n iterations
+        self.bestx = None
+
+        # polynomial coefficients averaged over the last n iterations
+        self.best_fit = None
+
+        # polynomial coefficients for the most recent fit
+        self.current_fit = None
+
+        # x values for detected line pixels
+        self.all_x = None
+
+        # y values for detected line pixels
+        self.all_y = None
+
+        self.recent_fits = collections.deque(maxlen=4)
+
+        self.fit_tolerance = np.array([0.1, 0.1, 0.1])
+
+    def update(self, fit, fit_x, all_x, all_y):
+        self.recent_xfitted.append(fit_x)
+        self.recent_fits.append(fit)
+        self.current_fit = fit
+        self.all_x = all_x
+        self.all_y = all_y
+        self.bestx = np.average(np.array(list(self.recent_xfitted)), axis=0)
+        self.best_fit = np.average(np.array(list(self.recent_fits)), axis=0)
+
+    def validate(self, fit, fit_x, all_x, all_y):
+        if self.best_fit is None:
+            self.update(fit, fit_x, all_x, all_y)
+            self.detected = True
+            return
+
+        diffs = np.abs(fit - self.best_fit)
+        ratio = diffs / self.best_fit
+
+        if np.array((ratio <= self.fit_tolerance)).all():
+            self.update(fit, fit_x, all_x, all_y)
+            self.detected = True
+        else:
+            self.detected = False
+
+    @property
+    def fit(self):
+        return self.current_fit
+
 
 class LaneDetector:
     def __init__(self, nwindows=9, minpixels=50, margin=100):
         self.nwindows = nwindows
         self.minpixels = minpixels
         self.margin = margin
-        self.left_fit_poly = None
-        self.right_fit_poly = None
         self.minpix = minpixels
         self.ym_per_pix = 30/720.0
         self.xm_per_pix = 3.7/660.0
         self.curvature = 0.
-        self.leftline = None
-        self.rightline = None
+        self.leftline = Line()
+        self.rightline = Line()
+
+    def reset(self):
+        self.leftline = Line()
+        self.rightline = Line()
 
     def window_search(self, binary_warped):
         histogram = np.sum(
@@ -109,78 +141,149 @@ class LaneDetector:
         # left lane line pixels
         leftx = nonzerox[left_lane_inds]
         lefty = nonzeroy[left_lane_inds]
-
+        assert len(leftx) != 0
+        assert len(lefty) != 0
         # right lane line pixels
         rightx = nonzerox[right_lane_inds]
         righty = nonzeroy[right_lane_inds]
 
+        assert len(rightx) != 0
+        assert len(righty) != 0
         # Fit a second order polynomial to each
-        self.left_fit_poly = np.polyfit(lefty, leftx, 2)
-        self.right_fit_poly = np.polyfit(righty, rightx, 2)
+        left_fit = np.polyfit(lefty, leftx, 2)
+        right_fit = np.polyfit(righty, rightx, 2)
+
+        return leftx, lefty, left_fit, rightx, righty, right_fit
 
     def apply_poly(self, arr, poly, margin=0):
         return poly[0]*(arr**2) + poly[1]*arr + poly[2] + margin
 
-    def detect(self, binary_warped):
-        # if the polynomials are None, this is the first frame
-        # so we perform a sliding window search
-        # if self.left_fit_poly is None and self.right_fit_poly is None:
-        #     self.window_search(binary_warped)
-        self.window_search(binary_warped)
-        # Else we search the lane lines pixels within a range
-        # with respect to the polynomial applied to the value of the
-        # current frame
-        nonzero = binary_warped.nonzero()
-        nonzeroy = np.array(nonzero[0])
-        nonzerox = np.array(nonzero[1])
+    def lane_detected(self):
+        return self.leftline.detected and self.rightline.detected
 
-
-        left_lane_inds = (
-            (nonzerox >
-                self.apply_poly(
-                    nonzeroy, self.left_fit_poly, -self.margin
-                )) &
-            (nonzerox <
-                self.apply_poly(
-                    nonzeroy, self.left_fit_poly, self.margin))
+    def detect2(self, binary_warped):
+        ploty = np.linspace(
+                0,
+                binary_warped.shape[0] - 1,
+                binary_warped.shape[0]
         )
 
-        right_lane_inds = (
-            (nonzerox >
-                self.apply_poly(
-                    nonzeroy, self.right_fit_poly, -self.margin
-                )) &
-            (nonzerox <
-                self.apply_poly(
-                    nonzeroy, self.right_fit_poly, self.margin))
-        )
+        if not self.lane_detected():
+            leftx, lefty, left_fit, rightx, righty, right_fit = self.window_search(binary_warped)
 
-        # Again, extract left and right line pixel positions
-        leftx = nonzerox[left_lane_inds]
-        lefty = nonzeroy[left_lane_inds]
+            fitx = self.apply_poly(ploty, left_fit)
+            self.leftline.validate(left_fit, fitx, leftx, lefty)
 
-        rightx = nonzerox[right_lane_inds]
-        righty = nonzeroy[right_lane_inds]
+            fitx = self.apply_poly(ploty, right_fit)
+            self.rightline.validate(right_fit, fitx, rightx, righty)
 
-        self.left_fit_poly = np.polyfit(lefty, leftx, 2)
-        self.right_fit_poly = np.polyfit(righty, rightx, 2)
-        self.update_curvature(binary_warped)
+            return self.lane_detected()
+
+        else:
+            # a previous lane was detected
+            nonzero = binary_warped.nonzero()
+            nonzeroy = np.array(nonzero[0])
+            nonzerox = np.array(nonzero[1])
+
+
+            left_lane_inds = (
+                (nonzerox >
+                    self.apply_poly(
+                        nonzeroy, self.leftline.fit, -self.margin
+                    )) &
+                (nonzerox <
+                    self.apply_poly(
+                        nonzeroy, self.leftline.fit, self.margin))
+            )
+
+            right_lane_inds = (
+                (nonzerox >
+                    self.apply_poly(
+                        nonzeroy, self.rightline.fit, -self.margin
+                    )) &
+                (nonzerox <
+                    self.apply_poly(
+                        nonzeroy, self.rightline.fit, self.margin))
+            )
+
+            # Again, extract left and right line pixel positions
+            leftx = nonzerox[left_lane_inds]
+            lefty = nonzeroy[left_lane_inds]
+
+            rightx = nonzerox[right_lane_inds]
+            righty = nonzeroy[right_lane_inds]
+
+            left_fit = np.polyfit(lefty, leftx, 2)
+            right_fit = np.polyfit(righty, rightx, 2)
+
+            fitx = self.apply_poly(ploty, left_fit)
+            self.leftline.validate(left_fit, fitx, leftx, lefty)
+
+            fitx = self.apply_poly(ploty, right_fit)
+            self.rightline.validate(right_fit, fitx, rightx, righty)
+
+            return self.lane_detected()
+
+    # def detect(self, binary_warped):
+    #     # if the polynomials are None, this is the first frame
+    #     # so we perform a sliding window search
+    #     # if self.left_fit_poly is None and self.right_fit_poly is None:
+    #     #     self.window_search(binary_warped)
+    #     self.window_search(binary_warped)
+    #     # Else we search the lane lines pixels within a range
+    #     # with respect to the polynomial applied to the value of the
+    #     # current frame
+    #     nonzero = binary_warped.nonzero()
+    #     nonzeroy = np.array(nonzero[0])
+    #     nonzerox = np.array(nonzero[1])
+
+
+    #     left_lane_inds = (
+    #         (nonzerox >
+    #             self.apply_poly(
+    #                 nonzeroy, self.left_fit_poly, -self.margin
+    #             )) &
+    #         (nonzerox <
+    #             self.apply_poly(
+    #                 nonzeroy, self.left_fit_poly, self.margin))
+    #     )
+
+    #     right_lane_inds = (
+    #         (nonzerox >
+    #             self.apply_poly(
+    #                 nonzeroy, self.right_fit_poly, -self.margin
+    #             )) &
+    #         (nonzerox <
+    #             self.apply_poly(
+    #                 nonzeroy, self.right_fit_poly, self.margin))
+    #     )
+
+    #     # Again, extract left and right line pixel positions
+    #     leftx = nonzerox[left_lane_inds]
+    #     lefty = nonzeroy[left_lane_inds]
+
+    #     rightx = nonzerox[right_lane_inds]
+    #     righty = nonzeroy[right_lane_inds]
+
+    #     self.left_fit_poly = np.polyfit(lefty, leftx, 2)
+    #     self.right_fit_poly = np.polyfit(righty, rightx, 2)
+    #     self.update_curvature(binary_warped)
 
     def update_curvature(self, binary_warped):
 
         leftx, rightx, ploty = self.get_lines(binary_warped)
         y_eval = binary_warped.shape[0] - 20
 
-        left_fit_poly = np.polyfit(ploty*self.ym_per_pix, leftx*self.xm_per_pix, 2)
-        right_fit_poly = np.polyfit(ploty*self.ym_per_pix, rightx*self.xm_per_pix, 2)
+        left_fit = np.polyfit(ploty*self.ym_per_pix, leftx*self.xm_per_pix, 2)
+        right_fit = np.polyfit(ploty*self.ym_per_pix, rightx*self.xm_per_pix, 2)
 
         left_curve_rad = (
-            (1 + (2*left_fit_poly[0]*y_eval*self.ym_per_pix + left_fit_poly[1])**2)**1.5
-        ) / np.absolute(2*left_fit_poly[0])
+            (1 + (2*left_fit[0]*y_eval*self.ym_per_pix + left_fit[1])**2)**1.5
+        ) / np.absolute(2*left_fit[0])
 
         right_curve_rad = (
-            (1 + (2*right_fit_poly[0]*y_eval*self.ym_per_pix + self.right_fit_poly[1])**2)**1.5
-        ) / np.absolute(2*self.right_fit_poly[0])
+            (1 + (2*right_fit[0]*y_eval*self.ym_per_pix + right_fit[1])**2)**1.5
+        ) / np.absolute(2*right_fit[0])
 
         self.curvature = np.mean(np.array([left_curve_rad, right_curve_rad]))
 
@@ -191,8 +294,10 @@ class LaneDetector:
         l, r, ys = self.get_lines(binary_warped)
         warp_zero = np.zeros_like(binary_warped).astype(np.uint8)
         color_warp = np.dstack((warp_zero, warp_zero, warp_zero))*255
+
         pts_left = np.array([np.transpose(np.vstack([l, ys]))])
         pts_right = np.array([np.flipud(np.transpose(np.vstack([r, ys])))])
+
         pts = np.hstack((pts_left, pts_right))
         return cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
 
@@ -205,15 +310,16 @@ class LaneDetector:
             binary_warped.shape[0] - 1,
             binary_warped.shape[0]
         )
-        left_fitx = self.apply_poly(ploty, self.left_fit_poly)
-        right_fitx = self.apply_poly(ploty, self.right_fit_poly)
+        left_fitx = self.apply_poly(ploty, self.leftline.fit)
+        right_fitx = self.apply_poly(ploty, self.rightline.fit)
         return left_fitx, right_fitx, ploty
 
     def get_position_from_lane_center(self, binary_warped):
         y_eval = binary_warped.shape[0] - 20
         midx = binary_warped.shape[1] / 2
-        x_left_pix = self.left_fit_poly[0]*(y_eval**2) + self.left_fit_poly[1]*y_eval + self.left_fit_poly[2]
-        x_right_pix = self.right_fit_poly[0]*(y_eval**2) + self.right_fit_poly[1]*y_eval + self.right_fit_poly[2]
+
+        x_left_pix = self.leftline.fit[0]*(y_eval**2) + self.leftline.fit[1]*y_eval + self.leftline.fit[2]
+        x_right_pix = self.rightline.fit[0]*(y_eval**2) + self.rightline.fit[1]*y_eval + self.rightline.fit[2]
         
         return ((x_left_pix + x_right_pix)/2.0 - midx) * self.xm_per_pix
 
@@ -222,10 +328,8 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     binary_warped = plt.imread('./test_images/warped_example.jpg')
     detector = LaneDetector()
-    detector.detect(binary_warped)
+    detector.detect2(binary_warped)
     res = detector.draw_lane_warped(binary_warped)
-    print(detector.left_fit_poly)
-    print(detector.right_fit_poly)
     print(detector.get_position_from_lane_center(binary_warped))
     print(detector.curvature)
 
