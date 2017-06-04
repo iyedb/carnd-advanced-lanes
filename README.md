@@ -890,7 +890,7 @@ HTML("""
   <source src="./project_video_output.mp4">
 </video>
 
-[![Pipeline output video](https://img.youtube.com/vi/tClktJiGYNI/0.jpg)](https://www.youtube.com/watch?v=tClktJiGYNI)
+[![Pipeline output video](https://img.youtube.com/vi/Gmp9o-fcPpw/0.jpg)](https://www.youtube.com/watch?v=Gmp9o-fcPpw)
 
 
 # Final discussion
