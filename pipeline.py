@@ -15,22 +15,23 @@ class Pipeline:
         self.M = M
         self.Minv = Minv
         self.curv = None
+        self.reset_counter = 0
+        self.frame_counter = 0
+        self.detection_failures_counter = 0
 
     def process_frame(self, frame):
-        binary_warped = thresholding.threshold(
+        self.frame_counter += 1
+        binary_warped, rgb = thresholding.threshold2(
             frame,
             self.mtx,
             self.coeffs,
             self.M
-        )[0]
+        )
+
         self.detector.detect(binary_warped)
         lane = self.detector.draw_lane(binary_warped, self.Minv)
         frame = utils.weighted_img(frame, lane)
-        if self.curv is None:
-            self.curv = 'Radius of Curvature: %.2fm' % self.detector.curvature
-        # r = random.choice(range(1, 10))
-        # if r == 1:
-        #     self.curv = 'Radius of Curvature: %.2fm' % self.detector.curvature
+
         self.curv = 'Radius of Curvature: %.2fm' % self.detector.curvature
         cv2.putText(
             frame,
@@ -40,7 +41,7 @@ class Pipeline:
             1, (255, 255, 255), 2
         )
 
-        dist = np.absolute(self.detector.get_position_from_lane_center(binary_warped))
+        dist = np.absolute(self.detector.get_position_from_lane_center(binary_warped.shape))
         if dist >= 0:
             dist_text = '%.2fm %s' % (dist, 'right')
         else:
@@ -53,11 +54,20 @@ class Pipeline:
             cv2.FONT_HERSHEY_SIMPLEX,
             1, (255, 255, 255), 2
         )
-
-        return frame
+        return self.compose_frame(frame, binary_warped, rgb)
 
     def __call__(self, frame):
         return self.process_frame(frame)
+
+    def compose_frame(self, frame1, frame2, frame3):
+        _output1 = np.dstack((np.zeros_like(frame2), frame2*255, np.zeros_like(frame2)))
+        output1 = cv2.resize(_output1,(640, 360), interpolation = cv2.INTER_AREA)
+        output2 = cv2.resize(frame3,(640, 360), interpolation = cv2.INTER_AREA)
+        outframe = np.zeros((720, 1280+640, 3))
+        outframe[:720, :1280,:] = frame1
+        outframe[:360, 1280:1920,:] = output1
+        outframe[360:720, 1280:1920,:] = output2
+        return outframe
 
 
 if __name__ == '__main__':

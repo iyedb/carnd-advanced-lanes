@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 def perspective_change(img_arr, M):
     return cv2.warpPerspective(
         img_arr,
@@ -16,6 +17,7 @@ def undistort_image(img_arr, matrix, coeffs):
 
 def weighted_img(img, initial_img, α=0.3, β=1., λ=0.):
     return cv2.addWeighted(initial_img, α, img, β, λ)
+
 
 def abs_sobel_thresh(img, orient='x', thresh_min=0, thresh_max=255, kernel_size=3, hls=False):
     # Convert to grayscale
@@ -89,67 +91,27 @@ def threshold(img_array, matrix, coeffs, M, color=False):
     img = undistort_image(img, matrix, coeffs)
     undistorted_img = perspective_change(img, M)
 
-    gradx_binary = abs_sobel_thresh(
-        undistorted_img,
-        orient='x',
-        thresh_min=50,
-        thresh_max=80,
-        kernel_size=7
-    )
-
-    # grady_binary = abs_sobel_thresh(
+    # gradx_binary = abs_sobel_thresh(
     #     undistorted_img,
-    #     orient='y',
+    #     orient='x',
     #     thresh_min=50,
-    #     thresh_max=70,
+    #     thresh_max=80,
     #     kernel_size=7
     # )
 
-    # mag_binary = magnitude_thresh(
-    #     undistorted_img,
-    #     sobel_kernel=5,
-    #     mag_thresh=(45, 80)
-    # )
-
-    # dir_binary = dir_threshold(
-    #     undistorted_img,
-    #     sobel_kernel=7,
-    #     thresh=(.9, 1.3)
-    # )
-
-    # combined_mag_dir = np.zeros_like(dir_binary)
-    # combined_mag_dir[(mag_binary == 1) & (dir_binary == 1)] = 1
-
-    # combined = np.zeros_like(dir_binary)
-    # combined[
-    #     (
-    #         (gradx_binary == 1) &
-    #         (grady_binary == 1)
-    #     )
-    # ] = 1
-
-    # combined[((gradx_binary == 1) & (grady_binary == 1)) | ((mag_binary == 1) & (dir_binary == 1))] = 1
-
     luv = cv2.cvtColor(undistorted_img, cv2.COLOR_RGB2LUV)
-    l_luv = luv[:, :, 0]
-    white_line = np.zeros_like(l_luv)
-    white_line[(l_luv >= 210)] = 1
-    white_line[(gradx_binary == 1) & (white_line == 1)]
 
+    lchannel = luv[:, :, 0]
+    white_line = np.zeros_like(lchannel)
+    white_line[(lchannel >= 210)] = 1
 
     hls = cv2.cvtColor(undistorted_img, cv2.COLOR_RGB2HLS)
+
     schannel = hls[:, :, 2]
     sthresh_min = 150
     sthresh_max = 255
     sbinary = np.zeros_like(schannel)
     sbinary[(schannel >= sthresh_min) & (schannel <= sthresh_max)] = 1
-
-    hue = hls[:, :, 0]
-    hthresh_min = 20
-    hthresh_max = 100
-    hbinary = np.zeros_like(hue)
-    hbinary[(hue >= hthresh_min) & (hue <= hthresh_max)] = 1
-
 
     lchannel = hls[:, :, 1]
     lthresh_min = 150
@@ -157,14 +119,55 @@ def threshold(img_array, matrix, coeffs, M, color=False):
     lbinary = np.zeros_like(lchannel)
     lbinary[(lchannel >= lthresh_min) & (lchannel <= lthresh_max)] = 1
 
-    lsbinary = np.zeros_like(hue)
+    lsbinary = np.zeros_like(schannel)
     lsbinary[(lbinary == 1) & (sbinary == 1)] = 1
 
-    color_and_gradient = np.zeros_like(schannel)
-    color_and_gradient[(lsbinary == 1) | (white_line == 1)] = 1
+    yellow_and_white = np.zeros_like(schannel)
+    yellow_and_white[(lsbinary == 1) | (white_line == 1)] = 1
 
-    rgb = np.dstack((lsbinary*255, white_line*255, np.zeros_like(color_and_gradient)))
-    return color_and_gradient, rgb
+    rgb = np.dstack((lsbinary*255, np.zeros_like(yellow_and_white), white_line*255))
+    return yellow_and_white, rgb
+
+
+def thresh(img, thresh_min, thresh_max):
+    ret = np.zeros_like(img)
+    ret[(img >= thresh_min) & (img <= thresh_max)] = 1
+    return ret
+
+
+def threshold2(img_array, matrix, coeffs, M, color=False):
+    img = np.copy(img_array)
+    img = undistort_image(img, matrix, coeffs)
+    img = perspective_change(img, M)
+    b_img = np.zeros((img.shape[0],img.shape[1]))
+
+    hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+    H = hsv[:,:,0]
+    S = hsv[:,:,1]
+    V = hsv[:,:,2]
+
+    R = img[:,:,0]
+    G = img[:,:,1]
+    B = img[:,:,2]
+
+    t_yellow_H = thresh(H,10,30)
+    t_yellow_S = thresh(S,50,255)
+    t_yellow_V = thresh(V,150,255)
+
+    t_white_R = thresh(R,225,255)
+    t_white_V = thresh(V,230,255)
+
+    yellow_line = np.zeros_like(t_yellow_H)
+    white_line = np.zeros_like(t_yellow_H)
+    yellow_line[(t_yellow_H==1) & (t_yellow_S==1) & (t_yellow_V==1)] = 1
+    white_line[(t_white_R==1)|(t_white_V==1)] = 1
+
+    b_img[(t_yellow_H==1) & (t_yellow_S==1) & (t_yellow_V==1)] = 1
+    b_img[(t_white_R==1)|(t_white_V==1)] = 1
+    rgb = np.dstack((yellow_line*255, np.zeros_like(yellow_line), white_line*255))
+
+    return b_img, rgb
+
 
 if __name__ == '__main__':
     import pickle
@@ -176,8 +179,17 @@ if __name__ == '__main__':
     M = persp['M']
     Minv = persp['Minv']
 
-    # test_img = plt.imread('./test_images/signs_vehicles_xygrad.jpg')
-    test_img = plt.imread('./extracted_images/frame_42.jpg')
-    res, rgb = threshold(test_img, mtx, dist, M)
-    plt.imsave('./output_images/binary.png', res, cmap='gray')
-    plt.imsave('./output_images/color_binary.png', rgb)
+    test_img1 = plt.imread('./test_images/signs_vehicles_xygrad.jpg')
+    res, rgb = threshold(test_img1, mtx, dist, M)
+    plt.imsave('./output_images/binary1.png', res, cmap='gray')
+    plt.imsave('./output_images/color_binary1.png', rgb)
+
+    test_img2 = plt.imread('./extracted_images/frame_42.jpg')
+    res, rgb = threshold(test_img2, mtx, dist, M)
+    plt.imsave('./output_images/binary21.png', res, cmap='gray')
+    plt.imsave('./output_images/color_binary21.png', rgb)
+
+    test_img2 = plt.imread('./extracted_images/frame1299.jpg')
+    res, rgb = threshold(test_img2, mtx, dist, M)
+    plt.imsave('./output_images/binary31.png', res, cmap='gray')
+    plt.imsave('./output_images/color_binary31.png', rgb)

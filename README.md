@@ -827,7 +827,9 @@ plt.imshow(lane_on_image)
 
 
 # The final pipline and video processing
-The pipeline is coded in the Pipeline class in the pipeline.py file. The pipeline consists in generating the binary warped image of from the current frame, then thresholding to select the lane lines pixels, than fitting those pixels to y values to obtain two polynomials that describe the left and right curves or lane lines. The lane is then drawed on the frame, the curvature and displacement are also calculated and drawn on the output frame.
+The pipeline is coded in the Pipeline class in the pipeline.py file. The pipeline consists in generating the binary warped image of from the current frame, then thresholding to select the lane lines pixels, than fitting those pixels to y values to obtain two polynomials that describe the left and right curves or lane lines. The lane is then drawed on the frame, the curvature and displacement of the car from the center of the lane are also calculated and drawn on the output frame.
+
+A note about how the detection algorithm works: the input is a warped binary image containing only the lines isolated using thresholding. For first frame, the sliding window algorithm is used to find the pixels of the left and right lines. The detector checks if the the top and base lane widths are within a acceptable range in meters to decide if the a lane was detected or not. If a lane is found, the algorithm adds the polynomials describing the lines to a circular buffer of size 4 which is used to create an average of the left and right polynomials coefficients over the last 4 frames where the lane was detected. If for a particular frame, the lane was not detected those averaged polynomials are used instead of the current ones. Also if the lane lines are not found 3 times in a row, the sliding window search kicks in again the next frame.
 
 
 ```python
@@ -890,8 +892,9 @@ HTML("""
   <source src="./project_video_output.mp4">
 </video>
 
-[![Pipeline output video](https://img.youtube.com/vi/Gmp9o-fcPpw/0.jpg)](https://www.youtube.com/watch?v=Gmp9o-fcPpw)
+
+[![Pipeline output video](https://img.youtube.com/vi/PXS1B4T9E_M/0.jpg)](https://www.youtube.com/watch?v=PXS1B4T9E_M)
 
 
 # Final discussion
-fine tuning the different thresholds is tricky even with a lot of tuning the result can be inconsistent. Object like cars very close to the lane lines and espcially shadows are challenging to remove using thresholding and thus pixels corresponding to those elements are unduly selected as line pixels using the histogram and window search technique and thus the resulting polymonials do not describe the lines correctly. Clearly using only image processing alone is not enough to make sense of the environment of the car and particularly to detect the lane lines.
+fine tuning the different thresholds is tricky even with a lot of tuning the result can be inconsistent. Object like cars very close to the lane lines and espcially shadows and artifacts on the lane are challenging to remove using thresholding and thus pixels corresponding to those elements are unduly selected as line pixels using the histogram and window search technique and thus the resulting polymonials do not describe the lines correctly. Clearly using only image processing alone is not enough to make sense of the environment of the car and particularly to detect the lane lines.
