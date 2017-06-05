@@ -892,8 +892,8 @@ HTML("""
   <source src="./project_video_output.mp4">
 </video>
 
-[![Pipeline output video](https://img.youtube.com/vi/tClktJiGYNI/0.jpg)](https://www.youtube.com/watch?v=tClktJiGYNI)
+[![Pipeline output video](https://img.youtube.com/vi/PXS1B4T9E_M/0.jpg)](https://www.youtube.com/watch?v=PXS1B4T9E_M)
 
 
 # Final discussion
-fine tuning the different thresholds is tricky even with a lot of tuning the result can be inconsistent. Object like cars very close to the lane lines and espcially shadows are challenging to remove using thresholding and thus pixels corresponding to those elements are unduly selected as line pixels using the histogram and window search technique and thus the resulting polymonials do not describe the lines correctly. Clearly using only image processing alone is not enough to make sense of the environment of the car and particularly to detect the lane lines.
+fine tuning the different thresholds is tricky even with a lot of tuning the result can be inconsistent. Object like cars very close to the lane lines and espcially shadows and artifacts on the lane are challenging to remove using thresholding and thus pixels corresponding to those elements are unduly selected as line pixels using the histogram and window search technique and thus the resulting polymonials do not describe the lines correctly. Clearly using only image processing alone is not enough to make sense of the environment of the car and particularly to detect the lane lines.
