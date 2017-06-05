@@ -125,8 +125,48 @@ def threshold(img_array, matrix, coeffs, M, color=False):
     yellow_and_white = np.zeros_like(schannel)
     yellow_and_white[(lsbinary == 1) | (white_line == 1)] = 1
 
-    rgb = np.dstack((lsbinary*255, white_line*255, np.zeros_like(yellow_and_white)))
+    rgb = np.dstack((lsbinary*255, np.zeros_like(yellow_and_white), white_line*255))
     return yellow_and_white, rgb
+
+
+def thresh(img, thresh_min, thresh_max):
+    ret = np.zeros_like(img)
+    ret[(img >= thresh_min) & (img <= thresh_max)] = 1
+    return ret
+
+
+def threshold2(img_array, matrix, coeffs, M, color=False):
+    img = np.copy(img_array)
+    img = undistort_image(img, matrix, coeffs)
+    img = perspective_change(img, M)
+    b_img = np.zeros((img.shape[0],img.shape[1]))
+
+    hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+    H = hsv[:,:,0]
+    S = hsv[:,:,1]
+    V = hsv[:,:,2]
+
+    R = img[:,:,0]
+    G = img[:,:,1]
+    B = img[:,:,2]
+
+    t_yellow_H = thresh(H,10,30)
+    t_yellow_S = thresh(S,50,255)
+    t_yellow_V = thresh(V,150,255)
+
+    t_white_R = thresh(R,225,255)
+    t_white_V = thresh(V,230,255)
+
+    yellow_line = np.zeros_like(t_yellow_H)
+    white_line = np.zeros_like(t_yellow_H)
+    yellow_line[(t_yellow_H==1) & (t_yellow_S==1) & (t_yellow_V==1)] = 1
+    white_line[(t_white_R==1)|(t_white_V==1)] = 1
+
+    b_img[(t_yellow_H==1) & (t_yellow_S==1) & (t_yellow_V==1)] = 1
+    b_img[(t_white_R==1)|(t_white_V==1)] = 1
+    rgb = np.dstack((yellow_line*255, np.zeros_like(yellow_line), white_line*255))
+
+    return b_img, rgb
 
 
 if __name__ == '__main__':
@@ -141,15 +181,15 @@ if __name__ == '__main__':
 
     test_img1 = plt.imread('./test_images/signs_vehicles_xygrad.jpg')
     res, rgb = threshold(test_img1, mtx, dist, M)
-    plt.imsave('./output_images/binary.png', res, cmap='gray')
-    plt.imsave('./output_images/color_binary.png', rgb)
+    plt.imsave('./output_images/binary1.png', res, cmap='gray')
+    plt.imsave('./output_images/color_binary1.png', rgb)
 
     test_img2 = plt.imread('./extracted_images/frame_42.jpg')
     res, rgb = threshold(test_img2, mtx, dist, M)
-    plt.imsave('./output_images/binary2.png', res, cmap='gray')
-    plt.imsave('./output_images/color_binary2.png', rgb)
+    plt.imsave('./output_images/binary21.png', res, cmap='gray')
+    plt.imsave('./output_images/color_binary21.png', rgb)
 
     test_img2 = plt.imread('./extracted_images/frame1299.jpg')
     res, rgb = threshold(test_img2, mtx, dist, M)
-    plt.imsave('./output_images/binary3.png', res, cmap='gray')
-    plt.imsave('./output_images/color_binary3.png', rgb)
+    plt.imsave('./output_images/binary31.png', res, cmap='gray')
+    plt.imsave('./output_images/color_binary31.png', rgb)

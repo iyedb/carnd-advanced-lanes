@@ -827,7 +827,9 @@ plt.imshow(lane_on_image)
 
 
 # The final pipline and video processing
-The pipeline is coded in the Pipeline class in the pipeline.py file. The pipeline consists in generating the binary warped image of from the current frame, then thresholding to select the lane lines pixels, than fitting those pixels to y values to obtain two polynomials that describe the left and right curves or lane lines. The lane is then drawed on the frame, the curvature and displacement are also calculated and drawn on the output frame.
+The pipeline is coded in the Pipeline class in the pipeline.py file. The pipeline consists in generating the binary warped image of from the current frame, then thresholding to select the lane lines pixels, than fitting those pixels to y values to obtain two polynomials that describe the left and right curves or lane lines. The lane is then drawed on the frame, the curvature and displacement of the car from the center of the lane are also calculated and drawn on the output frame.
+
+A note about how the detection algorithm works: the input is a warped binary image containing only the lines isolated using thresholding. For first frame, the sliding window algorithm is used to find the pixels of the left and right lines. The detector checks if the the top and base lane widths are within a acceptable range in meters to decide if the a lane was detected or not. If a lane is found, the algorithm adds the polynomials describing the lines to a circular buffer of size 4 which is used to create an average of the left and right polynomials coefficients over the last 4 frames where the lane was detected. If for a particular frame, the lane was not detected those averaged polynomials are used instead of the current ones. Also if the lane lines are not found 3 times in a row, the sliding window search kicks in again the next frame.
 
 
 ```python
