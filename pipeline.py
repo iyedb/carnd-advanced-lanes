@@ -28,15 +28,9 @@ class Pipeline:
             self.M
         )
 
-        self.detector.detect3(binary_warped)
-        # detected =  self.detector.use_last_fit
-        # if not detected:
-        #     self.detection_failures_counter += 1
+        self.detector.detect(binary_warped)
         lane = self.detector.draw_lane(binary_warped, self.Minv)
         frame = utils.weighted_img(frame, lane)
-
-        # if self.curv is None:
-        #     self.curv = 'Radius of Curvature: %.2fm' % self.detector.curvature
 
         self.curv = 'Radius of Curvature: %.2fm' % self.detector.curvature
         cv2.putText(
@@ -60,43 +54,6 @@ class Pipeline:
             cv2.FONT_HERSHEY_SIMPLEX,
             1, (255, 255, 255), 2
         )
-
-        # cv2.putText(
-        #     frame,
-        #     'Detection failure (%d/%d)' % (self.detection_failures_counter, self.frame_counter),
-        #     (20,120),
-        #     cv2.FONT_HERSHEY_SIMPLEX,
-        #     1, (255, 0, 0), 2
-        # )
-
-        # cv2.putText(
-        #     frame,
-        #     'Lane widths: %.2f, %2f' % (self.detector.base_width[-1], self.detector.top_width[-1]),
-        #     (20,160),
-        #     cv2.FONT_HERSHEY_SIMPLEX,
-        #     1, (255, 0, 0), 2
-        # )
-
-        # cv2.putText(
-        #     frame,
-        #     'Lane spacings: base: {}'.format(self.detector.base_pixels),
-        #     (20,200),
-        #     cv2.FONT_HERSHEY_SIMPLEX,
-        #     1, (255, 0, 0), 2
-        # )
-        # cv2.putText(
-        #     frame,
-        #     'Lane spacings: top: {}'.format(self.detector.top_pixels),
-        #     (20,240),
-        #     cv2.FONT_HERSHEY_SIMPLEX,
-        #     1, (255, 0, 0), 2
-        # )
-
-
-        # if self.detection_failures_counter == 5:
-        #     self.reset_detector()
-        #     self.detection_failures_counter = 0
-
         return self.compose_frame(frame, binary_warped, rgb)
 
     def __call__(self, frame):
@@ -111,10 +68,6 @@ class Pipeline:
         outframe[:360, 1280:1920,:] = output1
         outframe[360:720, 1280:1920,:] = output2
         return outframe
-
-    def reset_detector(self):
-        self.detector.reset()
-        self.reset_counter += 1
 
 
 if __name__ == '__main__':
